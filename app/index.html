@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#EEF1F3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0E1318" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Ντεπόζιτο">
+  <meta name="description" content="Προσωπικό ημερολόγιο καυσίμων για αμάξι και μηχανάκι.">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Commissioner:wght@400..800&display=swap">
+  <link rel="stylesheet" href="styles.css">
+  <title>Ντεπόζιτο</title>
+</head>
+<body>
+  <main id="scroller">
+    <section class="view is-active" id="view-month" aria-label="Μήνας"></section>
+    <section class="view" id="view-history" aria-label="Ιστορικό"></section>
+    <section class="view" id="view-stats" aria-label="Στατιστικά"></section>
+    <section class="view" id="view-settings" aria-label="Ρυθμίσεις"></section>
+  </main>
+
+  <nav class="tabbar" aria-label="Κύρια πλοήγηση">
+    <button class="tab is-active" data-view="month" aria-current="page">
+      <span>Μήνας</span>
+    </button>
+    <button class="tab" data-view="history">
+      <span>Ιστορικό</span>
+    </button>
+    <button class="tab-add" data-act="add" aria-label="Νέο γέμισμα">
+    </button>
+    <button class="tab" data-view="stats">
+      <span>Στατιστικά</span>
+    </button>
+    <button class="tab" data-view="settings">
+      <span>Ρυθμίσεις</span>
+      <i class="tab-dot" hidden></i>
+    </button>
+  </nav>
+
+  <div class="scrim" id="scrim" hidden></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden></div>
+  <div class="viewer" id="viewer" hidden><img alt="Φωτογραφία απόδειξης"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
