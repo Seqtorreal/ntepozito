@@ -1,5 +1,5 @@
 // Offline: η εφαρμογή ανοίγει χωρίς internet. Τα δεδομένα δεν περνούν από εδώ, μένουν στο IndexedDB.
-const VERSION = 'ntepozito-v9';
+const VERSION = 'ntepozito-v10';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 const CDN = /^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.jsdelivr\.net)\//;
 

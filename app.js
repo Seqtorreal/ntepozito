@@ -853,10 +853,11 @@ async function onPhotoPicked(file) {
     const canvas = prepForOcr(bitmap);
     const { data } = await worker.recognize(canvas, {}, { blocks: true });
     if (draft !== forDraft) return;
-    const r = parseReceipt(data.lines.map(l => l.text));
+    const rows = toRows(data.words.filter(w => w.text.trim()).map(w => ({ t: w.text, c: Math.round(w.confidence), b: [w.bbox.x0, w.bbox.y0, w.bbox.x1, w.bbox.y1] })));
+    const r = parseReceipt(rows.map(ws => ws.map(w => w.t).join(' ')));
     forDraft.ocr = {
       w: canvas.width, h: canvas.height,
-      lines: data.lines.map(l => ({ conf: Math.round(l.confidence), words: l.words.map(w => ({ t: w.text, c: Math.round(w.confidence), b: [w.bbox.x0, w.bbox.y0, w.bbox.x1, w.bbox.y1] })) })),
+      lines: rows.map(ws => ({ conf: Math.round(sum(ws, w => w.c) / ws.length), words: ws })),
       src: Object.fromEntries(Object.entries(r.src).map(([k, n]) => [k, n && { v: n.v, line: n.line, raw: n.raw }])),
     };
     const filled = [];
@@ -870,6 +871,13 @@ async function onPhotoPicked(file) {
     fill('#f-amount', r.amount, 2, 'ποσό');
     fill('#f-liters', r.liters, 2, 'λίτρα');
     fill('#f-price', r.price, 3, 'τιμή λίτρου');
+    // η ημερομηνία αλλάζει μόνο αν ο χρήστης δεν την έχει πειράξει
+    const dateIn = $('#f-date');
+    if (r.date && dateIn?.value === forDraft.date) {
+      dateIn.value = r.date;
+      dateIn.closest('.field').classList.add('is-filled');
+      filled.push('ημερομηνία');
+    }
     updateHints();
     renderPhotoSlot(filled.length
       ? `<p>Συμπλήρωσα ${filled.join(', ')} από την απόδειξη. Έλεγξέ τα πριν την αποθήκευση.</p>`
@@ -881,15 +889,41 @@ async function onPhotoPicked(file) {
   }
 }
 
-// Ελληνικές αποδείξεις πρατηρίων: «ΣΥΝΟΛΟ 47,53», «ΠΟΣΟΤΗΤΑ 25,43 LT», «ΤΙΜΗ 1,869».
+// Ετικέτα αριστερά, τιμή δεξιά: ο αναγνώστης συχνά τις βγάζει σε χωριστές γραμμές.
+// Ενώνει λέξεις στο ίδιο ύψος της φωτογραφίας σε μία οπτική γραμμή (words: { t, c, b: [x0, y0, x1, y1] }).
+function toRows(words) {
+  const hs = words.map(w => w.b[3] - w.b[1]).sort((a, b) => a - b);
+  const tol = (hs[hs.length >> 1] || 20) * 0.6;
+  const rows = [];
+  for (const w of [...words].sort((a, b) => a.b[1] + a.b[3] - b.b[1] - b.b[3])) {
+    const y = (w.b[1] + w.b[3]) / 2;
+    const row = rows.find(r => Math.abs(r.y - y) < tol);
+    if (row) { row.words.push(w); row.y += (y - row.y) / row.words.length; } else rows.push({ y, words: [w] });
+  }
+  return rows.map(r => r.words.sort((a, b) => a.b[0] - b.b[0]));
+}
+
+// Ελληνικές αποδείξεις πρατηρίων: «ΣΥΝΟΛΟ 47,53», «ΠΟΣΟΤΗΤΑ 25,43 LT», «ΤΙΜΗ 1,869», «30/10/2026 17:56».
 // Δέχεται κείμενο ή πίνακα γραμμών· το src λέει από ποια γραμμή βγήκε κάθε τιμή (line: null = υπολογίστηκε).
 function parseReceipt(input) {
   const LOOK = { A: 'Α', B: 'Β', E: 'Ε', H: 'Η', I: 'Ι', K: 'Κ', M: 'Μ', N: 'Ν', O: 'Ο', P: 'Ρ', T: 'Τ', X: 'Χ', Y: 'Υ', Z: 'Ζ' };
   const norm = l => l.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[ABEHIKMNOPTXYZ]/g, c => LOOK[c]);
   const nums = (l, line) => [...l.matchAll(/(\d{1,4})\s?[.,]\s?(\d{2,3})(?!\d)/g)].map(m => ({ v: Number(`${m[1]}.${m[2]}`), dec: m[2].length, raw: m[0], line }));
   const lines = (Array.isArray(input) ? input : input.split('\n')).map(l => l.trim());
+  const DATE = /(?<!\d)(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2}|\d{2})(?!\d)(?:\D{1,3}(\d{1,2})[:.-](\d{2}))?/;
+  const pad = n => String(n).padStart(2, '0');
   const totals = [], litersC = [], priceC = [], all = [];
+  let date = null;
   lines.forEach((l, i) => {
+    const dm = l.match(DATE);
+    if (dm) {
+      l = l.replace(DATE, ' '); // τα νούμερα της ημερομηνίας δεν είναι ποσά
+      const [raw, d, m, y, hh = '12', mm = '00'] = dm;
+      const v = `${y.length === 2 ? `20${y}` : y}-${pad(m)}-${pad(d)}T${pad(hh)}:${mm}`;
+      const t = new Date(v);
+      // shortcut: δέχεται μόνο ημερομηνίες έως 2 χρόνια πίσω, για να μη μπερδεύεται με άλλους κωδικούς
+      if (!date && t.getMonth() === m - 1 && t.getDate() === +d && t <= Date.now() + DAY && t > Date.now() - 730 * DAY) date = { v, line: i, raw };
+    }
     const u = norm(l);
     const ns = nums(l, i);
     if (!ns.length) return;
@@ -901,8 +935,8 @@ function parseReceipt(input) {
     if (/ΤΙΜΗ|ΤΙΜ\.|\/L|\/Λ|ΡRΙCΕ|ΕUR\/|€\//.test(u)) priceC.push(...ns.filter(n => n.v >= 0.8 && n.v <= 3.5));
   });
   const max = list => list.reduce((a, n) => (n.v > a.v ? n : a));
-  const calc = v => ({ v: round(v, 2), line: null });
-  const price = priceC.find(n => n.dec === 3) ?? priceC[0] ?? all.find(n => n.dec === 3 && n.v >= 0.8 && n.v <= 3.5) ?? null;
+  const calc = (v, d = 2) => ({ v: round(v, d), line: null });
+  let price = priceC.find(n => n.dec === 3) ?? priceC[0] ?? all.find(n => n.dec === 3 && n.v >= 0.8 && n.v <= 3.5) ?? null;
   let liters = litersC.find(n => n.v !== price?.v) ?? null;
   let amount = totals.length ? max(totals) : null;
   // Η αντλία χρεώνει λίτρα × τιμή· αν το «ΣΥΝΟΛΟ» δεν διαβάστηκε καθαρά, αυτό είναι πιο αξιόπιστο
@@ -919,11 +953,12 @@ function parseReceipt(input) {
     if (cands.length) amount = max(cands);
   }
   if (amount && price && !liters) liters = calc(amount.v / price.v);
-  return { amount: amount?.v ?? null, liters: liters?.v ?? null, price: price?.v ?? null, src: { amount, liters, price } };
+  if (amount && liters && !price) price = calc(amount.v / liters.v, 3);
+  return { amount: amount?.v ?? null, liters: liters?.v ?? null, price: price?.v ?? null, date: date?.v ?? null, src: { amount, liters, price, date } };
 }
 
 /* ---------- «τι διάβασε»: σάρωση πάνω στη φωτογραφία ---------- */
-const FIELD = { amount: 'Ποσό', liters: 'Λίτρα', price: 'Τιμή' };
+const FIELD = { amount: 'Ποσό', liters: 'Λίτρα', price: 'Τιμή', date: 'Ημερομηνία' };
 const LOW = 60; // κάτω από αυτή τη βεβαιότητα (%) η λέξη σημειώνεται ως αβέβαιη
 
 function renderOcrView(el) {
@@ -933,12 +968,12 @@ function renderOcrView(el) {
   const keys = Object.entries(o.src).filter(([, n]) => n && n.line != null).map(([k, n]) => {
     const ws = o.lines[n.line].words;
     // η λέξη με τον αριθμό· αλλιώς όλη η γραμμή
-    const w = ws.find(x => digits(x.t) && digits(n.raw).includes(digits(x.t)));
+    const w = ws.find(x => digits(x.t) === digits(n.raw)) ?? ws.find(x => digits(x.t).length > 1 && digits(n.raw).includes(digits(x.t)));
     const b = w ? w.b : [Math.min(...ws.map(x => x.b[0])), Math.min(...ws.map(x => x.b[1])), Math.max(...ws.map(x => x.b[2])), Math.max(...ws.map(x => x.b[3]))];
     return `<i class="box key ${k}" style="${pos(b)}"><b>${FIELD[k]}</b></i>`;
   });
   const used = new Map(Object.entries(o.src).filter(([, n]) => n && n.line != null).map(([k, n]) => [n.line, k]));
-  const fmt = { amount: v => eur(v), liters: v => `${nf2.format(v)} λ`, price: v => `${nf3.format(v)} €/λ` };
+  const fmt = { amount: v => eur(v), liters: v => `${nf2.format(v)} λ`, price: v => `${nf3.format(v)} €/λ`, date: v => `${dateFmt.format(new Date(v))}, ${v.slice(11)}` };
   el.innerHTML = `
     <div class="ocr-scan" style="aspect-ratio:${o.w}/${o.h}">
       <img src="${photoURL(draft.photo)}" alt="Η απόδειξη με σημειωμένες τις λέξεις που διάβασε">
@@ -948,6 +983,7 @@ function renderOcrView(el) {
     </div>
     <ul class="kv ocr-found">${Object.keys(FIELD).map(k => {
       const n = o.src[k];
+      if (!(k in o.src)) return ''; // παλιότερες αναγνώσεις χωρίς ημερομηνία
       const how = !n ? 'δεν βρέθηκε' : n.line == null ? 'υπολογίστηκε από τα άλλα δύο' : `γραμμή ${n.line + 1}`;
       return `<li><span><i class="key-dot ${k}"></i>${FIELD[k]}<small>${how}</small></span><span>${n ? fmt[k](n.v) : '–'}</span></li>`;
     }).join('')}</ul>
