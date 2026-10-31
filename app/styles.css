@@ -411,6 +411,8 @@ h2.section { font-size: 20px; font-weight: 700; letter-spacing: -.01em; margin: 
 .pf-row.main input { font-size: 38px; font-weight: 750; letter-spacing: -.01em; }
 .pf-row.is-filled input { animation: filled 1.2s var(--ease-out); }
 @keyframes filled { 0% { color: var(--moto); } 100% { color: var(--face-ink); } }
+.field.is-filled input { animation: field-filled 1.2s var(--ease-out); }
+@keyframes field-filled { 0% { color: var(--moto); } }
 
 .fields { margin-top: 16px; background: var(--surface); border-radius: var(--r-md); }
 .field { display: flex; align-items: center; gap: 12px; padding: 0 16px; min-height: 52px; }
@@ -452,7 +454,7 @@ h2.section { font-size: 20px; font-weight: 700; letter-spacing: -.01em; margin: 
 .photo-text .link.see svg { width: 18px; height: 18px; }
 
 /* «Δες τι διάβασε»: γραμμή σάρωσης περνά πάνω από την απόδειξη και οι λέξεις εμφανίζονται όπως τις διάβασε */
-.ocr-view { margin-top: 12px; --amount: #30D158; --liters: #40C8E0; --price: #BF5AF2; --low: #FF453A; }
+.ocr-view { margin-top: 12px; --amount: #30D158; --liters: #40C8E0; --price: #BF5AF2; --date: #FFD60A; --low: #FF453A; }
 .ocr-scan { position: relative; border-radius: var(--r-md); overflow: hidden; background: var(--face); }
 .ocr-scan img { display: block; width: 100%; height: 100%; object-fit: fill; }
 .ocr-scan .box {
@@ -470,6 +472,7 @@ h2.section { font-size: 20px; font-weight: 700; letter-spacing: -.01em; margin: 
 .box.amount, .key-dot.amount, .ocr-lines .amount { --k: var(--amount); }
 .box.liters, .key-dot.liters, .ocr-lines .liters { --k: var(--liters); }
 .box.price, .key-dot.price, .ocr-lines .price { --k: var(--price); }
+.box.date, .key-dot.date, .ocr-lines .date { --k: var(--date); }
 .ocr-scan .scanline {
   position: absolute; left: 0; right: 0; top: 0; height: 3px;
   background: var(--amount); box-shadow: 0 0 16px 4px color-mix(in srgb, var(--amount) 60%, transparent);
